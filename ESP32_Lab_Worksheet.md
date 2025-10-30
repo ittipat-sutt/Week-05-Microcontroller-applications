@@ -390,24 +390,38 @@ Memory analysis complete!
 
 | Memory Section | Variable/Function | Address (ที่แสดงออกมา) | Memory Type |
 |----------------|-------------------|----------------------|-------------|
-| Stack | stack_var | 0x_______ | SRAM |
-| Global SRAM | sram_buffer | 0x_______ | SRAM |
-| Flash | flash_string | 0x_______ | Flash |
-| Heap | heap_ptr | 0x_______ | SRAM |
+| Stack | stack_var | 0x3ffb4570 | SRAM |
+| Global SRAM | sram_buffer | 0x3ffb16cc | SRAM |
+| Flash | flash_string | 0x3f407688 | Flash |
+| Heap | heap_ptr | 0x3ffb528c | SRAM |
 
 **Table 2.2: Memory Usage Summary**
 
 | Memory Type | Free Size (bytes) | Total Size (bytes) |
 |-------------|-------------------|--------------------|
-| Internal SRAM | _________ | 520,192 |
-| Flash Memory | _________ | varies |
-| DMA Memory | _________ | varies |
+| Internal SRAM |388884 bytes | 520,192 |
+| Flash Memory | 0 bytes | varies |
+| DMA Memory | 303024 bytes| varies |
 
 ### คำถามวิเคราะห์ (ง่าย)
 
 1. **Memory Types**: SRAM และ Flash Memory ใช้เก็บข้อมูลประเภทไหน?
+SRAM → เก็บข้อมูล “เปลี่ยนได้”
+
+Flash → เก็บข้อมูล “ถาวร” เช่น string, firmware
 2. **Address Ranges**: ตัวแปรแต่ละประเภทอยู่ใน address range ไหน?
+ประเภท	Address Range (ช่วงที่อยู่ในหน่วยความจำ)	ใช้ทำอะไร
+IRAM (Instruction RAM)	0x40080000 – 0x400A0000	เก็บโค้ดที่ต้องรันเร็ว เช่น ISR
+DRAM (Data RAM)	0x3FFB0000 – 0x40000000	เก็บตัวแปร, heap, stack
+Flash Memory	0x10000000 – 0x10400000	เก็บโปรแกรมและข้อมูลคงที่
+RTC Memory	0x3FF80000 – 0x3FF9FFFF	เก็บข้อมูลตอน deep sleep
+
 3. **Memory Usage**: ESP32 มี memory ทั้งหมดเท่าไร และใช้ไปเท่าไร?
+ประเภท	ขนาดโดยประมาณ	หมายเหตุ
+Instruction RAM (IRAM)	128 KB	เก็บโค้ดที่รันเร็ว
+Data RAM (DRAM)	320 KB	เก็บข้อมูลตัวแปรและ heap
+RTC Memory	8 KB	ใช้ตอน deep sleep
+Flash Memory	4 MB (บางรุ่น 16 MB)	เก็บโปรแกรมและข้อมูลถาวร
 
 ---
 
@@ -596,20 +610,20 @@ void app_main() {
 
 | Test Type | Memory Type | Time (μs) | Ratio vs Sequential |
 |-----------|-------------|-----------|-------------------|
-| Sequential | Internal SRAM | _______ | 1.00x |
-| Random | Internal SRAM | _______ | ____x |
-| Sequential | External Memory | _______ | ____x |
-| Random | External Memory | _______ | ____x |
+| Sequential | Internal SRAM | 12747 | 1.00x |
+| Random | Internal SRAM |14108 μs| 0.94x |
+| Sequential | External Memory |11984 μs |  1.11x |
+| Random | External Memory |  13616 μs | 1.14x |
 
 **Table 3.2: Stride Access Performance**
 
 | Stride Size | Time (μs) | Ratio vs Stride 1 |
 |-------------|-----------|------------------|
-| 1 | _______ | 1.00x |
-| 2 | _______ | ____x |
-| 4 | _______ | ____x |
-| 8 | _______ | ____x |
-| 16 | _______ | ____x |
+| 1 | 11693 μs | 1.00x |
+| 2 | 5889 μs |0.50xx |
+| 4 | 2847 μs | 0.24x |
+| 8 | 1577 μs | 0.13x |
+| 16 | 756 μs | 0.06x |
 
 ### คำถามวิเคราะห์
 
@@ -839,28 +853,34 @@ void app_main() {
 ### การบันทึกผลการทดลอง
 
 **Table 4.1: Dual-Core Performance Summary**
+<img width="939" height="849" alt="image" src="https://github.com/user-attachments/assets/e3188b2e-d6f4-4aaf-82c8-2b11b8501c4d" />
+
 
 | Metric | Core 0 (PRO_CPU) | Core 1 (APP_CPU) |
 |--------|-------------------|-------------------|
-| Total Iterations | _______ | _______ |
-| Average Time per Iteration (μs) | _______ | _______ |
-| Total Execution Time (ms) | _______ | _______ |
-| Task Completion Rate | _______ | _______ |
+| Total Iterations | 100 000 | 100 000 |
+| Average Time per Iteration (μs) | 12.4 | 12.0 |
+| Total Execution Time (ms) | 1240 | 1200_ |
+| Task Completion Rate | 100 | 100 |
 
 **Table 4.2: Inter-Core Communication**
 
 | Metric | Value |
 |--------|-------|
-| Messages Sent | _______ |
-| Messages Received | _______ |
-| Average Latency (μs) | _______ |
-| Queue Overflow Count | _______ |
+| Messages Sent | 500 |
+| Messages Received | 500 |
+| Average Latency (μs) | 35 |
+| Queue Overflow Count | 0 |
 
 ### คำถามวิเคราะห์
 
 1. **Core Specialization**: จากผลการทดลอง core ไหนเหมาะกับงานประเภทใด?
+สรุป: Core 0 สำหรับ “ควบคุม”, Core 1 สำหรับ “คำนวณ” — การแยกแบบนี้ช่วยให้ระบบเสถียรและเร็วขึ้น
 2. **Communication Overhead**: inter-core communication มี overhead เท่าไร?
+inter-core communication มี overhead เล็กน้อย แต่ไม่กระทบต่อ performance โดยรวม
 3. **Load Balancing**: การกระจายงานระหว่าง cores มีประสิทธิภาพหรือไม่?
+การกระจายงาน (task scheduling) ระหว่างคอร์มีประสิทธิภาพสูง
+workload ถูก balance ดี ทำให้ได้ throughput สูงสุดของ ESP32
 
 ---
 
@@ -874,16 +894,16 @@ void app_main() {
 ### แบบฟอร์มส่งงาน
 
 **ข้อมูลนักศึกษา:**
-- ชื่อ: _________________________________
-- รหัสนักศึกษา: _______________________
-- วันที่ทำการทดลอง: ___________________
+- ชื่อ: อิทธิพัทธิ์ สุทธินวล
+- รหัสนักศึกษา: 67030360
+- วันที่ทำการทดลอง: 30/10/2568
 
 **Checklist การทดลอง:**
-- [ ] Environment setup สำเร็จ (ต่อเนื่องจากสัปดาห์ที่ 4)
-- [ ] Memory architecture analysis เสร็จสมบูรณ์
-- [ ] Cache performance testing เสร็จสมบูรณ์
-- [ ] Dual-core analysis เสร็จสมบูรณ์
-- [ ] รายงานผลการทดลองครบถ้วน
+- [✔️ ] Environment setup สำเร็จ (ต่อเนื่องจากสัปดาห์ที่ 4)
+- [✔️ ] Memory architecture analysis เสร็จสมบูรณ์
+- [✔️ ] Cache performance testing เสร็จสมบูรณ์
+- [✔️ ] Dual-core analysis เสร็จสมบูรณ์
+- [✔️ ] รายงานผลการทดลองครบถ้วน
 
 **คะแนนประเมิน:**
 - การเตรียม Environment และ Continuity (15 คะแนน): _______
